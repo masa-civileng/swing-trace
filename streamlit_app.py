@@ -47,12 +47,17 @@ def job_folder(job):
 
 st.subheader('1. 動画と解析区間')
 upload=st.file_uploader('MP4 / MOV / WebM（100MB以下）',type=['mp4','mov','webm'],max_upload_size=100)
-if upload:st.video(upload)
+preview_width=st.select_slider('プレビューの横幅（px）',options=[240,320,400,480,640],value=320)
+if upload:st.video(upload,width=preview_width)
 a,b,c=st.columns(3)
 start=a.number_input('開始時刻（秒）',min_value=0.,max_value=600.,value=0.,step=.1)
 duration=b.number_input('解析する長さ（秒）',min_value=.2,max_value=6.,value=1.,step=.1)
 fps=c.selectbox('解析密度（毎秒の枚数）',[5,10,30])
 st.caption(f'受付時に予約する枚数：{math.ceil(duration*fps)+1}枚。まずは1秒・毎秒5枚で試してください。')
+remaining=pilot.remaining(st.session_state.owner,int(settings.get('GLOBAL_DAILY_FRAMES',60)),int(settings.get('USER_DAILY_FRAMES',20)))
+st.caption(f'本日の残り：この招待コード {remaining[1]}枚 ／ 全体 {remaining[0]}枚（日本時間9時に日付更新）。')
+if math.ceil(duration*fps)+1>min(remaining):
+    st.warning('必要枚数が本日の残りを超えています。解析する長さ、または解析密度を下げてください。')
 consent=st.checkbox('動画をサーバーへ送信し、選択区間の画像をOpenAIへ送ることに同意します。送信してよい動画を選びました。')
 st.caption('選択区間を30fpsに変換して解析します。保存データは次の解析開始時に24時間を超えたものを削除します。クラウド再起動で早く消える場合があります。')
 if st.button('この区間を解析する',type='primary'):
@@ -110,7 +115,7 @@ if all(pt is not None for pt in pts):d.line(pts,fill='#ffe987',width=3)
 for pt,col in zip(pts,['#ff5055','#20d7ee']):
     if pt:
         x,y=pt;d.ellipse((x-8,y-8,x+8,y+8),outline=col,width=3)
-left,right=st.columns([2,1]);left.image(im.convert('RGB'),width='stretch')
+left,right=st.columns([2,1]);left.image(im.convert('RGB'),width=preview_width)
 with right:
     st.write('座標を数値で修正できます。左上が(0,0)です。')
     with st.form(f'edit_{job["id"]}_{idx}_{job["revision"]}'):
@@ -136,6 +141,6 @@ if st.button('面付きMP4を作成',disabled=job['status']!='review'):
         except Exception:st.error('MP4を作成できませんでした。')
         finally:pilot.LOCK.release()
 if (p/'output.mp4').exists():
-    st.video(str(p/'output.mp4'))
+    st.video(str(p/'output.mp4'),width=preview_width)
     st.download_button('MP4をダウンロード',(p/'output.mp4').read_bytes(),file_name='swing-surface.mp4',mime='video/mp4')
 st.caption('出力は選択区間のみ・30fps・無音。2Dの推定表示です。速度測定・3D復元ではありません。')

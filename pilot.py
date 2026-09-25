@@ -29,7 +29,7 @@ def reserve(owner,start,duration,fps,global_limit,user_limit):
         total=c.execute('SELECT COALESCE(sum(n),0) FROM quota WHERE day=?',(day,)).fetchone()[0]
         user=c.execute('SELECT n FROM quota WHERE day=? AND owner=?',(day,owner)).fetchone()
         if total+n>global_limit or (user[0] if user else 0)+n>user_limit:
-            raise ValueError('本日の解析枚数上限に達しました。管理者にご連絡ください。')
+            raise ValueError(f'必要枚数は{n}枚です。本日の残りは、この招待コード{max(0,user_limit-(user[0] if user else 0))}枚、全体{max(0,global_limit-total)}枚です。解析時間か密度を下げてください。')
         c.execute('INSERT INTO quota VALUES(?,?,?) ON CONFLICT(day,owner) DO UPDATE SET n=n+excluded.n',(day,owner,n))
     return n
 
@@ -39,3 +39,11 @@ def cleanup():
         if path.is_dir() and len(path.name)==32 and all(c in '0123456789abcdef' for c in path.name) and time.time()-path.stat().st_mtime>86400:
             assert path.resolve().parent==ROOT.resolve()
             shutil.rmtree(path)
+
+
+def remaining(owner,global_limit,user_limit):
+    day=time.strftime('%Y-%m-%d',time.gmtime())
+    with database() as c:
+        total=c.execute('SELECT COALESCE(sum(n),0) FROM quota WHERE day=?',(day,)).fetchone()[0]
+        user=c.execute('SELECT n FROM quota WHERE day=? AND owner=?',(day,owner)).fetchone()
+    return max(0,global_limit-total),max(0,user_limit-(user[0] if user else 0))
